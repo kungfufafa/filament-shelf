@@ -1,0 +1,253 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\CustomAssetAttributeResource\Pages;
+use App\Models\Category;
+use App\Models\CustomAssetAttribute;
+use App\Models\User;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables;
+use Filament\Tables\Table;
+
+class CustomAssetAttributeResource extends Resource
+{
+    protected static ?string $model = CustomAssetAttribute::class;
+
+    protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-adjustments-horizontal';
+
+    public static function getCategoryOptions()
+    {
+        $categories = Category::with('children')->get();
+
+        $options = [];
+        foreach ($categories as $category) {
+            if ($category->children->isNotEmpty()) {
+                $subcategories = $category->children->pluck('name', 'id')->toArray();
+                $options[$category->name] = $subcategories;
+            }
+        }
+
+        return $options;
+    }
+
+    public static function form(Schema $form): Schema
+    {
+        return $form
+            ->schema([
+                Grid::make([
+                    'default' => 1,
+                    'lg' => 3,
+                ])
+                    ->schema([
+                        Group::make()
+                            ->schema([
+                                Section::make('Informasi Dasar')
+                                    ->schema([
+                                        Forms\Components\TextInput::make('name')
+                                            ->placeholder('Masukkan nama atribut')
+                                            ->required()
+                                            ->maxLength(255),
+
+                                        Forms\Components\Select::make('type')
+                                            ->required()
+                                            ->options(CustomAssetAttribute::typeOptions())
+                                            ->searchable()
+                                            ->placeholder('Pilih tipe input')
+                                            ->live(),
+                                    ])
+                                    ->columns(2),
+
+                                Section::make('Pengaturan Notifikasi')
+                                    ->schema([
+                                        Forms\Components\Toggle::make('is_notifiable')
+                                            ->inline(false)
+                                            ->default(false)
+                                            ->helperText('Kirim pengingat harian saat dokumen atau tanggal atribut masuk masa pembaruan.')
+                                            ->live(),
+
+                                        Forms\Components\Select::make('notification_type')
+                                            ->options([
+                                                'relative_date' => 'Harian sebelum tanggal berlaku habis',
+                                                'fixed_date' => 'Tanggal tetap',
+                                            ])
+                                            ->default('relative_date')
+                                            ->placeholder('Pilih pola pengingat')
+                                            ->helperText('Untuk dokumen masa berlaku, gunakan pola harian sebelum tanggal berlaku habis.')
+                                            ->required()
+                                            ->live()
+                                            ->visible(fn (callable $get) => $get('is_notifiable')),
+
+                                        Forms\Components\TextInput::make('notification_offset')
+                                            ->placeholder('Contoh: 30, 14, 7')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->helperText('Notifikasi muncul setiap hari mulai H-ini sampai tanggal/lampiran diperbarui.')
+                                            ->visible(fn (callable $get) => $get('notification_type') === 'relative_date'),
+
+                                        Forms\Components\DatePicker::make('fixed_notification_date')
+                                            ->placeholder('Pilih tanggal tetap untuk notifikasi')
+                                            ->visible(fn (callable $get) => $get('notification_type') === 'fixed_date'),
+
+                                        Forms\Components\CheckboxList::make('notification_channels')
+                                            ->options(CustomAssetAttribute::notificationChannelOptions())
+                                            ->default([CustomAssetAttribute::CHANNEL_WHATSAPP])
+                                            ->columns(2)
+                                            ->helperText('Pilih satu atau lebih channel. Email dan WhatsApp memakai kontak dari user penerima.')
+                                            ->visible(fn (callable $get) => $get('is_notifiable')),
+
+                                        Forms\Components\Select::make('notification_recipient_user_ids')
+                                            ->options(fn () => User::orderBy('name')->pluck('name', 'id')->toArray())
+                                            ->multiple()
+                                            ->searchable()
+                                            ->preload()
+                                            ->placeholder('Pilih orang penerima pengingat')
+                                            ->helperText('Email dikirim ke email user. WhatsApp dikirim ke Nomor WhatsApp pada data user.')
+                                            ->visible(fn (callable $get) => $get('is_notifiable'))
+                                            ->columnSpanFull(),
+                                    ])
+                                    ->visible(fn (callable $get) => in_array($get('type'), [
+                                        CustomAssetAttribute::TYPE_DATE,
+                                        CustomAssetAttribute::TYPE_DOCUMENT_EXPIRY,
+                                    ], true))
+                                    ->columns([
+                                        'default' => 1,
+                                        'md' => 2,
+                                    ])
+                                    ->collapsed(false),
+                            ])
+                            ->columnSpan([
+                                'default' => 1,
+                                'lg' => 2,
+                            ]),
+
+                        Section::make('Status Atribut')
+                            ->schema([
+                                Forms\Components\Toggle::make('required')
+                                    ->inline(false)
+                                    ->default(false),
+
+                                Forms\Components\Toggle::make('is_active')
+                                    ->inline(false)
+                                    ->default(true),
+
+                                Forms\Components\Select::make('category_id')
+                                    ->options(self::getCategoryOptions())
+                                    ->multiple()
+                                    ->searchable()
+                                    ->placeholder('Pilih kategori yang relevan')
+                                    ->afterStateHydrated(function ($state, callable $set) {
+                                        if ($state) {
+                                            $set('category_id', array_map('intval', $state));
+                                        }
+                                    }),
+
+                            ])
+                            ->columns(1)
+                            ->columnSpan([
+                                'default' => 1,
+                                'lg' => 1,
+                            ]),
+                    ]),
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('name')
+                    ->searchable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('type')
+                    ->searchable()
+                    ->toggleable(),
+                Tables\Columns\IconColumn::make('required')
+                    ->boolean()
+                    ->toggleable(),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
+                    ->toggleable(),
+                Tables\Columns\BadgeColumn::make('category_id')
+                    ->colors([
+                        'primary',
+                    ])
+                    ->formatStateUsing(function ($state) {
+                        $categories = Category::whereIn('id', is_array($state) ? $state : [$state])->pluck('name')->toArray();
+
+                        return implode(', ', $categories);
+                    })
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('is_notifiable')
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('notification_type')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('notification_channels')
+                    ->formatStateUsing(fn (CustomAssetAttribute $record): string => collect($record->notificationChannels())
+                        ->map(fn (string $channel): string => CustomAssetAttribute::notificationChannelOptions()[$channel] ?? $channel)
+                        ->implode(', '))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('notification_offset')
+                    ->numeric()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('fixed_notification_date')
+                    ->date()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('type')
+                    ->options(CustomAssetAttribute::typeOptions()),
+                Tables\Filters\TernaryFilter::make('required'),
+                Tables\Filters\TernaryFilter::make('is_active'),
+                Tables\Filters\TernaryFilter::make('is_notifiable'),
+            ])
+            ->persistFiltersInSession()
+            ->persistSearchInSession()
+            ->persistSortInSession()
+            ->columnToggleFormColumns(2)
+            ->actions([
+                EditAction::make(),
+            ])
+            ->bulkActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListCustomAssetAttributes::route('/'),
+            'create' => Pages\CreateCustomAssetAttribute::route('/create'),
+            'edit' => Pages\EditCustomAssetAttribute::route('/{record}/edit'),
+        ];
+    }
+}
