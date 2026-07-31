@@ -52,7 +52,7 @@ class BusinessEntityResource extends Resource
                     ->required(),
                 FileUpload::make('letterhead')
                     ->image()
-                    ->disk('public')
+                    ->disk(config('filesystems.default'))
                     ->directory('kopsurat'),
             ]);
     }
