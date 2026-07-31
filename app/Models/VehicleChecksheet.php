@@ -91,38 +91,38 @@ class VehicleChecksheet extends Model
     protected function deleteRelatedFiles(): void
     {
         if ($this->departure_photo) {
-            Storage::disk('public')->delete($this->departure_photo);
+            Storage::disk(config('filesystems.default'))->delete($this->departure_photo);
         }
 
         if ($this->departure_damage_report) {
-            Storage::disk('public')->delete($this->departure_damage_report);
+            Storage::disk(config('filesystems.default'))->delete($this->departure_damage_report);
         }
 
         if ($this->return_photo) {
-            Storage::disk('public')->delete($this->return_photo);
+            Storage::disk(config('filesystems.default'))->delete($this->return_photo);
         }
 
         if ($this->return_damage_report) {
-            Storage::disk('public')->delete($this->return_damage_report);
+            Storage::disk(config('filesystems.default'))->delete($this->return_damage_report);
         }
     }
 
     protected function deleteOldFiles(): void
     {
         if ($this->isDirty('departure_photo') && $this->getOriginal('departure_photo')) {
-            Storage::disk('public')->delete($this->getOriginal('departure_photo'));
+            Storage::disk(config('filesystems.default'))->delete($this->getOriginal('departure_photo'));
         }
 
         if ($this->isDirty('departure_damage_report') && $this->getOriginal('departure_damage_report')) {
-            Storage::disk('public')->delete($this->getOriginal('departure_damage_report'));
+            Storage::disk(config('filesystems.default'))->delete($this->getOriginal('departure_damage_report'));
         }
 
         if ($this->isDirty('return_photo') && $this->getOriginal('return_photo')) {
-            Storage::disk('public')->delete($this->getOriginal('return_photo'));
+            Storage::disk(config('filesystems.default'))->delete($this->getOriginal('return_photo'));
         }
 
         if ($this->isDirty('return_damage_report') && $this->getOriginal('return_damage_report')) {
-            Storage::disk('public')->delete($this->getOriginal('return_damage_report'));
+            Storage::disk(config('filesystems.default'))->delete($this->getOriginal('return_damage_report'));
         }
     }
 }

@@ -89,7 +89,7 @@ class VehicleChecksheetResource extends Resource
                             ->dehydrated(),
                         Forms\Components\FileUpload::make('departure_photo')
                             ->required()
-                            ->disk('public')
+                            ->disk(config('filesystems.default'))
                             ->directory('vehiclechecksheet')
                             ->previewable()
                             ->imagePreviewHeight('250')
@@ -106,7 +106,7 @@ class VehicleChecksheetResource extends Resource
                             ),
                         Forms\Components\FileUpload::make('departure_damage_report')
                             ->required()
-                            ->disk('public')
+                            ->disk(config('filesystems.default'))
                             ->directory('vehiclechecksheet')
                             ->previewable()
                             ->imagePreviewHeight('250')
@@ -134,7 +134,7 @@ class VehicleChecksheetResource extends Resource
                             ->required(),
                         Forms\Components\FileUpload::make('return_photo')
                             ->required()
-                            ->disk('public')
+                            ->disk(config('filesystems.default'))
                             ->directory('vehiclechecksheet')
                             ->previewable()
                             ->imagePreviewHeight('250')
@@ -148,7 +148,7 @@ class VehicleChecksheetResource extends Resource
                             ),
                         Forms\Components\FileUpload::make('return_damage_report')
                             ->required()
-                            ->disk('public')
+                            ->disk(config('filesystems.default'))
                             ->directory('vehiclechecksheet')
                             ->previewable()
                             ->imagePreviewHeight('250')
